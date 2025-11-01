@@ -6,8 +6,13 @@ on:
   schedule:
     # 매일 23:00 UTC에 실행 (한국 시간(KST) 기준 다음날 오전 8시)
     - cron: '0 23 * * *'
-  # (수동 실행도 가능하도록 workflow_dispatch 추가)
+  
+  # 수동 실행을 위한 트리거
   workflow_dispatch:
+  
+  # main 브랜치에 push(커밋)가 발생할 때마다 실행 (테스트용)
+  push:
+    branches: [ main ]
 
 # 실행할 작업 정의
 jobs:
