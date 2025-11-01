@@ -31,17 +31,18 @@ RSS_FEEDS = {
     "문화_SBS": "https://news.sbs.co.kr/news/SectionRssFeed.do?sectionId=08&plink=RSSREADER",
     "문화_한겨레": "http://www.hani.co.kr/rss/culture/",
     
-    # --- 🔽 AI 관련 뉴스 추가 🔽 ---
+    # --- AI 관련 뉴스 추가 ---
     "AI_전문(AI타임즈)": "https://www.aitimes.com/rss/all.xml",
     "AI_IT(ZDNet)": "https://www.zdnet.co.kr/rss/ittrend.xml",
     
-    # --- 🔽 문화콘텐츠 관련 뉴스 추가 🔽 ---
+    # --- 문화콘텐츠 관련 뉴스 추가 ---
     "콘텐츠_게임(게임메카)": "https://www.gamemeca.com/rss/all.xml",
     "콘텐츠_영화(씨네21)": "http://www.cine21.com/rss/news.xml",
     "콘텐츠_산업(KOCCA)": "https://www.kocca.kr/kocca/bbs/rss.do?bbsId=B0000137&searchBbsId=B0000137"
 }
 
-# --- 4. [신규] 중복 체크를 위해 기존 URL 가져오기 ---
+# --- 4. [수정됨] 중복 체크를 위해 기존 URL 가져오기 ---
+# (노션 DB의 "수집일", "URL" 속성 이름을 사용합니다)
 def get_existing_urls(days_to_check=3):
     print(f"중복 방지를 위해 최근 {days_to_check}일간의 기존 기사 URL을 조회합니다...")
     existing_urls = set()
@@ -57,7 +58,7 @@ def get_existing_urls(days_to_check=3):
         
         for page in results:
             properties = page.get("properties", {})
-            url_data = properties.get("URL", {})
+            url_data = properties.get("URL", {}) # 노션의 "URL" 속성
             if url_data and url_data.get("url"):
                 existing_urls.add(url_data.get("url"))
                 
@@ -67,15 +68,20 @@ def get_existing_urls(days_to_check=3):
         print(f"❌ 기존 URL 로드 중 오류 발생: {e}")
         return existing_urls
 
-# --- 5. 노션 업로드 함수 ---
-def add_to_notion(title, url, category):
+# --- 5. [수정됨] 노션 업로드 함수 (요약 추가) ---
+# (노션 DB의 "제목", "URL", "분류", "수집일", "요약" 속성 이름을 사용합니다)
+def add_to_notion(title, url, category, summary): # 'summary' 매개변수 추가
     today_str = datetime.datetime.now().strftime("%Y-%m-%d")
     try:
+        # 요약(summary)이 너무 길 경우 2000자(API 제한)로 자름
+        summary_text = summary[:2000] if summary else "요약 없음"
+
         new_page = {
             "제목": {"title": [{"text": {"content": title}}]},
             "URL": {"url": url},
             "분류": {"multi_select": [{"name": category}]},
-            "수집일": {"date": {"start": today_str}}
+            "수집일": {"date": {"start": today_str}},
+            "요약": {"rich_text": [{"text": {"content": summary_text}}]} # ✨ '요약' 속성 추가
         }
         notion.pages.create(parent={"database_id": DATABASE_ID}, properties=new_page)
         print(f"✅ [업로드 성공!] 카테고리: {category} | 제목: {title}")
@@ -83,7 +89,7 @@ def add_to_notion(title, url, category):
         print(f"❌ [업로드 실패] 제목: {title} | 오류: {e}")
         pass
 
-# --- 6. 메인 실행 로직 ---
+# --- 6. [수정됨] 메인 실행 로직 (요약 전달) ---
 def fetch_and_filter_news():
     print("="*30)
     print("📰 뉴스 수집 및 필터링을 시작합니다...")
@@ -108,7 +114,7 @@ def fetch_and_filter_news():
                 total_skipped += 1
                 continue 
 
-            summary = item.get("summary", "") 
+            summary = item.get("summary", "") # ✨ 요약본 가져오기
             content_to_check = title + " " + summary
             
             found_category = None
@@ -118,7 +124,7 @@ def fetch_and_filter_news():
                     break 
             
             if found_category:
-                add_to_notion(title, link, found_category)
+                add_to_notion(title, link, found_category, summary) # ✨ 'summary' 전달
                 existing_urls.add(link)
                 total_uploaded += 1
             
